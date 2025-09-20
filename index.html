@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Croc Run</title>
+<style>
+  body { margin:0; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; background:#c0f0ff; }
+  canvas { background: linear-gradient(#c0f0ff,#e0ffe0); display:block; }
+</style>
+</head>
+<body>
+<canvas id="game" width="900" height="360"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+let score = 0;
+let gameOver = false;
+
+// Player (крокодил)
+const player = {
+  x: 80,
+  y: H - 60 - 40,
+  w: 80,
+  h: 40,
+  vy: 0,
+  gravity: 1800,
+  jumpPower: -650,
+  onGround: true
+};
+
+// Obstacles
+let obstacles = [];
+let spawnTimer = 0;
+let spawnInterval = 1.4;
+let speed = 320;
+
+// Управление
+function jump(){
+  if(player.onGround){
+    player.vy = player.jumpPower;
+    player.onGround = false;
+  }
+}
+window.addEventListener('keydown', e => { if(e.code==='Space'){ e.preventDefault(); jump(); } });
+canvas.addEventListener('mousedown', jump);
+canvas.addEventListener('touchstart', e=>{ e.preventDefault(); jump(); }, {passive:false});
+
+// Функции
+function spawnObstacle(){
+  const h = 30 + Math.random()*40;
+  obstacles.push({x: W, y: H-60-h, w: 26+Math.random()*20, h: h, passed:false});
+}
+function rectOverlap(a,b){ return !(a.x+a.w<b.x || a.x>b.x+b.w || a.y+a.h<b.y || a.y>b.y+b.h); }
+function reset(){ score=0; gameOver=false; player.y=H-60-40; player.vy=0; player.onGround=true; obstacles=[]; spawnTimer=0; speed=320; requestAnimationFrame(loop); }
+function drawCroc(x,y,w,h){
+  ctx.fillStyle='#3aa33a'; ctx.fillRect(x,y,w,h); // тело
+  ctx.fillStyle='#bfe6b6'; ctx.fillRect(x+6,y+h*0.35,w*0.5,h*0.5); // живот
+  ctx.fillStyle='#2e9a2e'; ctx.beginPath(); ctx.ellipse(x-12,y+h*0.45,18,h*0.5,0,0,2*Math.PI); ctx.fill(); // голова
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x-18,y+h*0.3,6,0,2*Math.PI); ctx.fill(); // глаз
+  ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(x-18,y+h*0.3,3,0,2*Math.PI); ctx.fill(); // зрачок
+  ctx.fillStyle='#3aa33a'; ctx.beginPath(); ctx.moveTo(x+w,y+h*0.5); ctx.lineTo(x+w+22,y+h*0.2); ctx.lineTo(x+w+22,y+h*0.8); ctx.closePath(); ctx.fill(); // хвост
+}
+function update(dt){
+  if(gameOver) return;
+  player.vy += player.gravity*dt;
+  player.y += player.vy*dt;
+  if(player.y>=H-60-player.h){ player.y=H-60-player.h; player.vy=0; player.onGround=true; }
+  spawnTimer += dt;
+  if(spawnTimer>=spawnInterval){ spawnTimer=0; spawnInterval=0.9+Math.random()*1.2; spawnObstacle(); }
+  for(let i=obstacles.length-1;i>=0;i--){
+    let ob=obstacles[i];
+    ob.x -= speed*dt;
+    if(ob.x+ob.w<0) obstacles.splice(i,1);
+    if(!ob.passed && ob.x+ob.w<player.x){ ob.passed=true; score++; if(score%5===0)speed+=25; }
+    if(rectOverlap(player,ob)) gameOver=true;
+  }
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#a0d080'; ctx.fillRect(0,H-60,W,60); // земля
+  drawCroc(player.x,player.y,player.w,player.h);
+  ctx.fillStyle='#8b5a2b'; for(const ob of obstacles) ctx.fillRect(ob.x,ob.y,ob.w,ob.h);
+  ctx.fillStyle='#000'; ctx.font='24px sans-serif'; ctx.fillText('Очки: '+score, 10,30);
+  if(gameOver){ ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff'; ctx.font='36px sans-serif'; ctx.textAlign='center'; ctx.fillText('Игра окончена', W/2,H/2); ctx.font='20px sans-serif'; ctx.fillText('Клик или пробел — рестарт', W/2,H/2+30); }
+}
+let last=0;
+function loop(ts){
+  if(!last) last=ts;
+  const dt = (ts-last)/1000;
+  last=ts;
+  update(dt); draw();
+  if(!gameOver) requestAnimationFrame(loop);
+}
+loop();
+canvas.addEventListener('mousedown',()=>{ if(gameOver) reset(); });
+window.addEventListener('keydown',e=>{ if(gameOver && e.code==='Space') reset(); });
+</script>
+</body>
+</html>
